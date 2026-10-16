@@ -147,12 +147,23 @@ export default Plugin.define({
             fetchModelUsage(credentials.token, credentials.platform, context.signal),
             fetchToolUsage(credentials.token, credentials.platform, context.signal),
           ])
+
+          // Best effort: highlight the calling session's model in the pricing block.
+          let selectedModelID: string | undefined
+          try {
+            const session = await ctx.session.get({ sessionID: context.sessionID })
+            selectedModelID = session.model?.id
+          } catch {
+            // Session lookup is optional.
+          }
+
           return {
-            content: renderMarkdown(
-              snapshot,
-              model.status === "fulfilled" ? model.value : undefined,
-              tools.status === "fulfilled" ? tools.value : undefined,
-            ),
+            content: renderMarkdown(snapshot, {
+              model: model.status === "fulfilled" ? model.value : undefined,
+              tools: tools.status === "fulfilled" ? tools.value : undefined,
+              selectedModelID,
+              pricing: true,
+            }),
           }
         },
       })

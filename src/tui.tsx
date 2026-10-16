@@ -75,7 +75,10 @@ export default Plugin.define({
             try {
               const fresh = (await zai.get({ maxAgeMs: DIALOG_MAX_AGE_MS })) as unknown as UsageSnapshot
               setSnapshot(fresh)
-              await context.ui.dialog.alert({ title: "Z.ai Coding Plan", message: renderPlain(fresh) })
+              await context.ui.dialog.alert({
+                title: "Z.ai Coding Plan",
+                message: renderPlain(fresh, { selectedModelID: context.ui.model.current()?.modelID }),
+              })
             } catch (error) {
               await context.ui.dialog.alert({ title: "Z.ai usage", message: describe(error) })
             }

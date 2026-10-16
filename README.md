@@ -7,14 +7,34 @@ surgery, no extra agent round-trips, zero runtime dependencies.
 ## What you get
 
 - **`zai_usage` tool** — compact, accurate quota report for the agent to call
-  on demand: 5-hour token window, weekly limit, and monthly MCP tool usage,
-  each with percentage, progress bar, and reset time. `detail: true` adds the
-  24-hour model/tool breakdown.
+  on demand: 5-hour credit window, weekly limit, and monthly MCP tool usage,
+  each with percentage, progress bar, and reset time, plus derived absolute
+  credits for your plan tier. `detail: true` adds the 24-hour model/tool
+  breakdown and a pricing reference block.
 - **Status-line badge** — `ZAI 21% · 2h 41m` in the prompt footer, always
-  current (refreshed after every session goes idle), color-coded at 60% and
-  90%. Zero model calls.
-- **`/zai` command** — instant dialog with the full quota table. Zero model
-  calls.
+  current (refreshed as usage events land), color-coded at 60% and 90%, with a
+  `· peak` marker during peak hours. Zero model calls.
+- **`/zai` command** — instant dialog with the full quota table, credits, and
+  pricing (your selected model highlighted). Zero model calls.
+
+## Credits & pricing
+
+The monitoring API reports percentages of your **credit** allowance
+(docs.z.ai/devpack/overview), not raw tokens. The plugin derives absolute
+credits from the plan tier the API reports (Lite 2,000/10,000, Pro
+12,000/60,000, Max 28,000/140,000 per 5h/week) and shows reference pricing:
+
+- Peak hours are Mon–Fri 14:00–18:00 SGT; everything else is off-peak at
+  0.5× credits. The badge flags peak windows and the dialog counts down to
+  the next transition.
+- Model credit multipliers (GLM-5.3: 6.9/1.7/24, Flash: 2.3/0.56/8 for
+  input/cached/output) and the MCP per-call cost (1.2) come from the docs,
+  including the documented routing of older model names.
+
+These constants live in `src/pricing.ts` with their source and check date —
+quota percentages always come live from the API, and static values are never
+mixed into live numbers. The China plan (open.bigmodel.cn) has different,
+undocumented terms, so pricing is global-plan only.
 
 ## Install
 
@@ -57,9 +77,10 @@ Z.ai monitoring API            OpenCode server                TUI
   (`ctx.integration.connection`), never from parsing files. Falls back to
   `ZHIPU_API_KEY` (or legacy `ZAI_API_KEY`) when no connection exists.
 - **One fetch, many consumers**: a shared TTL cache (60s default) backed by
-  in-flight deduplication serves the tool, badge, and dialog. The badge also
-  refreshes whenever a session goes idle, so it reflects real usage without
-  polling.
+  in-flight deduplication serves the tool, badge, and dialog. The cache also
+  refreshes on `session.usage.updated` — every model call of every session,
+  including parallel ones — with a 5-minute drift floor for usage that happens
+  outside this instance, all capped at one fetch per 30s.
 - **The API key never leaves the server plugin.** The TUI talks to it over
   the plugin RPC channel and receives parsed snapshots only.
 - **Only percentages are reported for token windows** — the monitoring API

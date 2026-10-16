@@ -37,4 +37,4 @@ const [model, tools] = await Promise.all([
   fetchToolUsage(token, platform, signal).catch(() => undefined),
 ])
 
-console.log(renderMarkdown({ ...quota, platform, fetchedAt: Date.now() }, model, tools))
+console.log(renderMarkdown({ ...quota, platform, fetchedAt: Date.now() }, { model, tools, selectedModelID: "glm-5.3", pricing: true }))
