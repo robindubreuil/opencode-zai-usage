@@ -31,8 +31,10 @@ const INTEGRATION_PLATFORM: Record<(typeof INTEGRATION_IDS)[number], Platform> =
 
 /** Tool-visible cache lifetime: fresh enough to avoid fetch storms, stale enough to feel instant. */
 const TOOL_MAX_AGE_MS = 10_000
-/** Background refresh floor for session-idle triggers. */
-const IDLE_MIN_AGE_MS = 30_000
+/** Minimum age before event-triggered background refreshes fetch again. */
+const REFRESH_MIN_AGE_MS = 30_000
+/** Guaranteed refresh floor covering usage that never fires local events. */
+const DRIFT_INTERVAL_MS = 5 * 60_000
 
 interface Credentials {
   readonly token: string
@@ -156,18 +158,35 @@ export default Plugin.define({
       })
     })
 
-    // Keep the badge current: refresh after a session finishes working.
+    // Keep the badge current.
+    //
+    // `session.usage.updated` fires on every model call of every session —
+    // including parallel ones — so refreshes track live consumption mid-run.
+    // `session.idle` covers anything that slips through. Both share the same
+    // age gate and in-flight dedup, capping fetches at one per REFRESH_MIN_AGE_MS.
+    // The drift interval guarantees convergence for usage that happens outside
+    // this instance (another machine or tool on the same plan).
+    const refreshIfStale = (minAgeMs: number) => {
+      if (!cache || Date.now() - cache.at > minAgeMs) void refresh().catch(() => {})
+    }
+
     const controller = new AbortController()
     void (async () => {
       for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
-        if (event.type !== "session.idle") continue
-        if (!cache || Date.now() - cache.at > IDLE_MIN_AGE_MS) void refresh().catch(() => {})
+        if (event.type === "session.usage.updated" || event.type === "session.idle") {
+          refreshIfStale(REFRESH_MIN_AGE_MS)
+        }
       }
     })()
+
+    const driftTimer = setInterval(() => refreshIfStale(REFRESH_MIN_AGE_MS), DRIFT_INTERVAL_MS)
 
     // Prime the badge; a user without Z.ai configured simply sees no badge.
     void refresh().catch((error) => console.error(`[zai-usage] initial fetch failed: ${explain(error)}`))
 
-    return () => controller.abort()
+    return () => {
+      clearInterval(driftTimer)
+      controller.abort()
+    }
   },
 })
