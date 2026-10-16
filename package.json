@@ -1,0 +1,46 @@
+{
+  "name": "opencode-zai-usage",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Z.ai GLM Coding Plan quota & usage for OpenCode — one token-efficient tool plus a live status-line badge.",
+  "license": "MIT",
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "zai",
+    "z.ai",
+    "glm",
+    "coding-plan",
+    "quota",
+    "usage"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./tui": "./src/tui.tsx",
+    "./rpc": "./src/rpc.ts"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "tsc",
+    "smoke": "tsx scripts/smoke.ts"
+  },
+  "peerDependencies": {
+    "@opencode/plugin": ">=2.0.0",
+    "@opentui/core": ">=0.5.17",
+    "@opentui/solid": ">=0.5.17",
+    "solid-js": ">=1.9.0"
+  },
+  "devDependencies": {
+    "@opencode/plugin": "2.0.31",
+    "@opentui/core": ">=0.5.17",
+    "@opentui/solid": ">=0.5.17",
+    "@types/node": "^20.19.0",
+    "solid-js": "^1.9.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.0"
+  }
+}
