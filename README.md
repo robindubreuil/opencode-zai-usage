@@ -39,23 +39,20 @@ undocumented terms, so pricing is global-plan only.
 ## Install
 
 ```sh
-npm install -g opencode-zai-usage   # or: npm install opencode-zai-usage
+opencode plugin add opencode-zai-usage
 ```
 
-Then add it to `~/.config/opencode/opencode.json`:
+One command: installs the package and registers it in your global OpenCode
+configuration. Updates and removal are managed the same way
+(`opencode plugin update`, `opencode plugin remove`, `opencode plugin list`).
+
+Prefer manual configuration? Reference the package (or a local checkout) in
+`~/.config/opencode/opencode.json`:
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-zai-usage"]
-}
-```
-
-Or use a local checkout:
-
-```jsonc
-{
-  "plugins": ["/absolute/path/to/opencode-zai-usage"]
+  "plugins": ["opencode-zai-usage"] // or: "/absolute/path/to/opencode-zai-usage"
 }
 ```
 
