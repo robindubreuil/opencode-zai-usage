@@ -36,7 +36,6 @@ export interface PlainOptions {
 const LABEL_5H = "5h credits"
 const LABEL_WEEKLY = "Weekly credits"
 const LABEL_MCP = "MCP tools"
-const LABEL_PAD = 16
 
 const numberFormat = new Intl.NumberFormat("en-US")
 
@@ -118,16 +117,17 @@ function rowsOf(payload: UsagePayload): Row[] {
 }
 
 /** Absolute credits derived from the API percentage and the documented plan allowance. */
-function creditsLine(payload: UsagePayload): string | undefined {
+function creditsLine(payload: UsagePayload, compact = false): string | undefined {
   const plan = payload.plan ? PLAN_CREDITS[payload.plan.toLowerCase()] : undefined
   if (!plan) return undefined
   const window = (pct: number | undefined, total: number) =>
     pct === undefined ? undefined : `≈${thousands(Math.round((pct / 100) * total))}/${thousands(total)}`
   const fiveHour = payload.fiveHour ? window(payload.fiveHour.percentage, plan.fiveHour) : undefined
   const weekly = payload.weekly ? window(payload.weekly.percentage, plan.weekly) : undefined
+  const weeklyLabel = compact ? "wk" : "weekly"
   const parts = [
     fiveHour && `5h ${fiveHour}`,
-    weekly && `weekly ${weekly}`,
+    weekly && `${weeklyLabel} ${weekly}`,
   ].filter((part): part is string => part !== undefined)
   return parts.length > 0 ? parts.join(" · ") : undefined
 }
@@ -209,29 +209,55 @@ export function renderMarkdown(payload: UsagePayload, options: MarkdownOptions =
 }
 
 // ---------------------------------------------------------------------------
-// TUI dialog (plain text)
+// TUI dialog (plain text, narrow-safe: every line fits ~50 columns)
 // ---------------------------------------------------------------------------
+
+function pricingPlain(selectedModelID: string | undefined, now: number): string[] {
+  const status = peakStatus(now)
+  const transition = `${clock(status.transitionsAt, now)} (in ${countdown(status.transitionsAt - now)})`
+  const lines = [
+    status.peak ? `Peak 1× · ends ${transition}` : `Off-peak 0.5× · next peak ${transition}`,
+    "  peak = Mon–Fri 14:00–18:00 SGT · docs.z.ai",
+  ]
+  const selectedKey = selectedModelID !== undefined ? canonicalModel(selectedModelID) : undefined
+  for (const key of Object.keys(MODEL_MULTIPLIERS)) {
+    const entry = MODEL_MULTIPLIERS[key]
+    const prefix = key === selectedKey ? "* " : ""
+    lines.push(`${prefix}${MODEL_NAMES[key] ?? key} · in ${entry.input} · cached ${entry.cached} · out ${entry.output}`)
+  }
+  const legend = selectedKey !== undefined ? " · * = selected" : ""
+  lines.push(`MCP tools · ${MCP_CREDIT_PER_CALL} credits/call${legend}`)
+  return lines
+}
 
 export function renderPlain(payload: UsagePayload, options: PlainOptions = {}): string {
   const now = options.now ?? Date.now()
-  const lines = [header(payload).replace(/^### /, ""), ""]
+  const lines: string[] = [header(payload).replace(/^### /, ""), ""]
 
-  for (const row of rowsOf(payload)) {
-    const label = `${row.label} `.padEnd(LABEL_PAD)
-    const pct = `${String(Math.round(row.percentage)).padStart(3)}%`
-    const extra = row.extra ? `  ${row.extra} used` : ""
-    const reset =
-      row.resetAt !== undefined && row.resetAt > now
-        ? `  resets ${row.label === LABEL_MCP ? monthDay(row.resetAt) : `${clock(row.resetAt, now)} (in ${countdown(row.resetAt - now)})`}`
-        : ""
-    lines.push(`${label}${pct} ${bar(row.percentage)}${extra}${reset}`)
+  const row = (label: string, percentage: number, tail: string) =>
+    `${label.padEnd(5)}${String(Math.round(percentage)).padStart(3)}% ${bar(percentage)}  ${tail}`.trimEnd()
+
+  if (payload.fiveHour) {
+    const window = payload.fiveHour
+    const tail = window.resetAt !== undefined && window.resetAt > now ? `in ${countdown(window.resetAt - now)} → ${clock(window.resetAt, now)}` : ""
+    lines.push(row("5h", window.percentage, tail))
+  }
+  if (payload.weekly) {
+    const window = payload.weekly
+    const tail = window.resetAt !== undefined && window.resetAt > now ? `in ${countdown(window.resetAt - now)} → ${clock(window.resetAt, now)}` : ""
+    lines.push(row("week", window.percentage, tail))
+  }
+  if (payload.mcp) {
+    const mcp = payload.mcp
+    const reset = mcp.resetAt !== undefined && mcp.resetAt > now ? ` · resets ${monthDay(mcp.resetAt)}` : ""
+    lines.push(row("mcp", mcp.percentage, `${thousands(mcp.used)}/${thousands(mcp.total)}${reset}`))
   }
 
-  const credits = creditsLine(payload)
-  if (credits) lines.push("", `Credits: ${credits}`)
+  const credits = creditsLine(payload, true)
+  if (credits) lines.push("", `Credits  ${credits}`)
 
   if (payload.platform === "global") {
-    lines.push("", ...pricingLines(options.selectedModelID, now, true))
+    lines.push("", ...pricingPlain(options.selectedModelID, now))
   }
   return lines.join("\n")
 }
