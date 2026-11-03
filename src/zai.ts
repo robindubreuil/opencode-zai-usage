@@ -101,11 +101,12 @@ interface RawTotalUsage {
 }
 
 // limit window identifiers observed in `limits[]`:
-//   ("TOKENS_LIMIT", unit 3, number 5) → 5-hour token window
-//   ("TOKENS_LIMIT", unit 6, number 1) → weekly token window
+//   ("TOKENS_LIMIT" or "CREDIT_LIMIT", unit 3, number 5) → 5-hour window
+//   ("TOKENS_LIMIT" or "CREDIT_LIMIT", unit 6, number 1) → weekly window
 //   ("TIME_LIMIT",   unit 5, number 1) → MCP tool usage, calendar month
-const isFiveHour = (limit: RawLimit) => limit.type === "TOKENS_LIMIT" && limit.unit === 3 && limit.number === 5
-const isWeekly = (limit: RawLimit) => limit.type === "TOKENS_LIMIT" && limit.unit === 6 && limit.number === 1
+const isTokenLimit = (limit: RawLimit) => limit.type === "TOKENS_LIMIT" || limit.type === "CREDIT_LIMIT"
+const isFiveHour = (limit: RawLimit) => isTokenLimit(limit) && limit.unit === 3 && limit.number === 5
+const isWeekly = (limit: RawLimit) => isTokenLimit(limit) && limit.unit === 6 && limit.number === 1
 const isMcp = (limit: RawLimit) => limit.type === "TIME_LIMIT"
 
 function number(value: unknown): number | undefined {
